@@ -1,5 +1,4 @@
 import streamlit as st
-from model import chatbot_response
 
 # 1. Konfigurasi Halaman (Judul Tab & Ikon)
 st.set_page_config(page_title="UAS Chatbot ML", page_icon="🤖")
@@ -54,3 +53,4 @@ if user_input := st.chat_input("Ketik pertanyaan Anda di sini..."):
     # Batasi history maksimal 10 percakapan (Sama seperti logika Flask Anda)
     if len(st.session_state["chat_history"]) > 10:
         st.session_state["chat_history"].pop(0)
+
