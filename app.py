@@ -1,64 +1,46 @@
-import os
-from flask import Flask, render_template, request, session
+import streamlit as st
 from model import chatbot_response
 
-app = Flask(__name__)
+# 1. Konfigurasi Halaman
+st.set_page_config(page_title="Apple Support Bot", page_icon="🍎")
 
-# Gunakan secret key yang aman. Di production, sebaiknya pakai environment variable.
-app.secret_key = "uas_machine_learning_chatbot" 
+st.title("🍎 Apple Support Chatbot")
+st.write("Silakan tanya seputar dukungan perangkat Apple (Bisa Bahasa Indonesia/Inggris).")
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    # 1. Inisialisasi Chat History
-    if "chat_history" not in session:
-        session["chat_history"] = []
+# 2. Inisialisasi Session State (Agar history chat tidak hilang saat reload)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    # 2. Logika Reset Chat
-    if request.args.get("reset") == "true":
-        session["chat_history"] = []
-        session.modified = True # Memaksa Flask memperbarui cookie session
+# 3. Sidebar: Tombol Reset
+with st.sidebar:
+    st.header("Pengaturan")
+    if st.button("Hapus Riwayat Chat"):
+        st.session_state.messages = []
+        st.rerun()
 
-    # 3. Logika Proses Pertanyaan (POST)
-    if request.method == "POST":
-        user_question = request.form.get("question")
+# 4. Tampilkan Chat History yang sudah ada
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-        # Cek agar input tidak kosong atau hanya spasi
-        if user_question and user_question.strip():
-            
-            # Panggil model chatbot dengan Error Handling
+# 5. Input User & Proses Jawaban
+if prompt := st.chat_input("Apa keluhan Anda?"):
+    
+    # Tampilkan pesan user
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # Simpan pesan user ke history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # Proses jawaban bot
+    with st.chat_message("assistant"):
+        with st.spinner("Sedang mencari jawaban..."):
             try:
-                bot_response = chatbot_response(user_question)
+                response = chatbot_response(prompt)
             except Exception as e:
-                bot_response = "Maaf, terjadi kesalahan internal pada model."
-                print(f"Error getting response: {e}")
-
-            # Update Session
-            # Ambil list, tambahkan data, lalu simpan kembali
-            # Ini cara paling aman agar session di Flask terdeteksi perubahannya
-            history = session["chat_history"]
-            
-            history.append({
-                "user": user_question,
-                "bot": bot_response
-            })
-
-            # PENTING: Batasi jumlah chat yang disimpan di session
-            # Cookie Flask memiliki batas ukuran (4KB). Jika chat terlalu panjang, error akan muncul.
-            # Kita batasi misal hanya menyimpan 10 percakapan terakhir.
-            if len(history) > 10:
-                history.pop(0) 
-
-            session["chat_history"] = history
-            session.modified = True
-
-    return render_template(
-        "index.html",
-        chat_history=session["chat_history"]
-    )
-
-if __name__ == "__main__":
-    # Konfigurasi untuk Deployment (Render/Heroku/Docker)
-    # Cloud biasanya menyediakan PORT via environment variable
-    # Host 0.0.0.0 wajib digunakan agar aplikasi bisa diakses dari luar container
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+                response = "Maaf, terjadi kesalahan pada sistem."
+            st.markdown(response)
+    
+    # Simpan jawaban bot ke history
+    st.session_state.messages.append({"role": "assistant", "content": response})
